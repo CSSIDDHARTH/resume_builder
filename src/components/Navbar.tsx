@@ -13,7 +13,7 @@ import {
   ChevronDown,
   Compass,
 } from 'lucide-react';
-import { ResumeAnalysisResult } from '../types';
+import { ResumeAnalysisResult, AppUserProfile } from '../types';
 import type { NavTab } from './Sidebar';
 import { User } from 'firebase/auth';
 import { AuthButton } from './AuthButton';
@@ -26,8 +26,8 @@ interface NavbarProps {
   activeAnalysis: ResumeAnalysisResult | null;
   onLoadDemo: () => void;
   onOpenMobileMenu?: () => void;
-  currentUser: User | null;
-  onAuthSuccess?: (user: User) => void;
+  currentUser: AppUserProfile | User | null;
+  onAuthSuccess?: (user: AppUserProfile | User) => void;
   onSignOutSuccess?: () => void;
 }
 

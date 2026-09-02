@@ -13,7 +13,7 @@ import {
   UploadCloud,
   CheckCircle2,
 } from 'lucide-react';
-import { AnalysisHistoryItem, SavedCloudReport, ResumeAnalysisResult } from '../types';
+import { AnalysisHistoryItem, SavedCloudReport, ResumeAnalysisResult, AppUserProfile } from '../types';
 import { deleteHistoryItem, clearAllHistory } from '../services/storage';
 import {
   subscribeToUserReports,
@@ -30,7 +30,7 @@ interface HistoryViewProps {
   onSelectReport: (result: ResumeAnalysisResult) => void;
   onNavigate: (tab: NavTab) => void;
   onLoadDemo: () => void;
-  currentUser: User | null;
+  currentUser: AppUserProfile | User | null;
 }
 
 export const HistoryView: React.FC<HistoryViewProps> = ({

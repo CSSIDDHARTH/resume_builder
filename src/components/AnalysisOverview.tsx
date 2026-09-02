@@ -19,16 +19,18 @@ import {
   Loader2,
   FileDown,
   Upload,
+  Eye,
 } from 'lucide-react';
-import { ResumeAnalysisResult } from '../types';
+import { ResumeAnalysisResult, AppUserProfile } from '../types';
 import { NavTab } from './Sidebar';
 import { User } from 'firebase/auth';
 import { saveReportToFirestore, signInWithGoogle } from '../services/firestoreService';
+import { DocumentViewerModal } from './DocumentViewerModal';
 
 interface AnalysisOverviewProps {
   analysis: ResumeAnalysisResult;
   onNavigate: (tab: NavTab) => void;
-  currentUser?: User | null;
+  currentUser?: AppUserProfile | User | null;
   onSavedToCloud?: (reportId: string) => void;
 }
 
@@ -43,6 +45,7 @@ export const AnalysisOverview: React.FC<AnalysisOverviewProps> = ({
   const [isSavingCloud, setIsSavingCloud] = useState<boolean>(false);
   const [cloudSavedSuccess, setCloudSavedSuccess] = useState<boolean>(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [isViewerModalOpen, setIsViewerModalOpen] = useState<boolean>(false);
 
   const handleSaveToCloud = async () => {
     setIsSavingCloud(true);
@@ -234,6 +237,15 @@ ${(keywordAnalysis?.missingKeywords || []).join(', ') || 'None identified'}
           >
             <Sparkles className="h-3.5 w-3.5" />
             <span>AI Enhance</span>
+          </button>
+
+          <button
+            onClick={() => setIsViewerModalOpen(true)}
+            className="flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs cursor-pointer transition-colors"
+            title="Inspect original resume document"
+          >
+            <Eye className="h-3.5 w-3.5 text-blue-600" />
+            <span>View Document</span>
           </button>
 
           <button
@@ -621,6 +633,18 @@ ${(keywordAnalysis?.missingKeywords || []).join(', ') || 'None identified'}
           </div>
         </div>
       )}
+
+      {/* Document Viewer Modal */}
+      <DocumentViewerModal
+        isOpen={isViewerModalOpen}
+        onClose={() => setIsViewerModalOpen(false)}
+        file={null}
+        fileUrl={null}
+        extractedText={analysis.rawResumeTextSnippet || 'No raw text snippet available for this report.'}
+        fileName={analysis.resumeName || 'Resume Document'}
+        detectedSections={analysis.sectionAnalyses?.map((s) => s.sectionName) || []}
+        fileType="Resume Document"
+      />
     </div>
   );
 };

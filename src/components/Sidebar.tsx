@@ -17,17 +17,16 @@ import {
   AlertCircle,
   ExternalLink,
 } from 'lucide-react';
-import { ResumeAnalysisResult } from '../types';
+import { ResumeAnalysisResult, AppUserProfile } from '../types';
 import { User } from 'firebase/auth';
 
 export type NavTab =
-  | 'landing'
   | 'dashboard'
   | 'upload'
   | 'analysis'
   | 'enhance-diff'
   | 'skill-gap'
-  | 'improvements'
+  | 'fixes'
   | 'rewriter'
   | 'interview'
   | 'resumes'
@@ -39,9 +38,9 @@ interface SidebarProps {
   onSelectTab: (tab: NavTab) => void;
   activeAnalysis: ResumeAnalysisResult | null;
   onLoadDemo: () => void;
-  isOpenMobile: boolean;
-  onCloseMobile: () => void;
-  currentUser: User | null;
+  isOpenMobile?: boolean;
+  onCloseMobile?: () => void;
+  currentUser: AppUserProfile | User | null;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({

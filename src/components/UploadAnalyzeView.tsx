@@ -17,6 +17,8 @@ import { parseResumeFile, analyzeResume } from '../services/api';
 import { parseFileHybrid } from '../services/fileParserClient';
 import { ResumeAnalysisResult, SavedResume } from '../types';
 import { SAMPLE_JOBS, SAMPLE_RESUMES } from '../data/demoData';
+import { DocumentPreviewCard } from './DocumentPreviewCard';
+import { DocumentViewerModal } from './DocumentViewerModal';
 
 interface UploadAnalyzeViewProps {
   onAnalysisComplete: (result: ResumeAnalysisResult) => void;
@@ -51,6 +53,9 @@ export const UploadAnalyzeView: React.FC<UploadAnalyzeViewProps> = ({
     fileType: string;
   } | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [isViewerModalOpen, setIsViewerModalOpen] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -63,6 +68,14 @@ export const UploadAnalyzeView: React.FC<UploadAnalyzeViewProps> = ({
       return;
     }
 
+    // Revoke old object URL if any
+    if (fileUrl) {
+      try { URL.revokeObjectURL(fileUrl); } catch {}
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setUploadedFile(file);
+    setFileUrl(objectUrl);
     setIsParsingFile(true);
     setFileName(file.name);
     setResumeName(file.name.replace(/\.[^/.]+$/, ''));
@@ -80,10 +93,22 @@ export const UploadAnalyzeView: React.FC<UploadAnalyzeViewProps> = ({
       setErrorMessage(
         err.message || 'We could not extract readable text from this file. Please verify the document format or try a DOCX/TXT file.'
       );
-      setFileName(null);
     } finally {
       setIsParsingFile(false);
     }
+  };
+
+  const handleClearFile = () => {
+    if (fileUrl) {
+      try { URL.revokeObjectURL(fileUrl); } catch {}
+    }
+    setUploadedFile(null);
+    setFileUrl(null);
+    setFileName(null);
+    setResumeText('');
+    setParsedStats(null);
+    setErrorMessage(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const onDrop = (e: React.DragEvent) => {
@@ -145,9 +170,14 @@ export const UploadAnalyzeView: React.FC<UploadAnalyzeViewProps> = ({
   };
 
   const handleSelectSampleResume = (sample: typeof SAMPLE_RESUMES[0]) => {
+    if (fileUrl) {
+      try { URL.revokeObjectURL(fileUrl); } catch {}
+    }
+    setUploadedFile(null);
+    setFileUrl(null);
     setResumeText(sample.textContent);
     setResumeName(sample.title);
-    setFileName(null);
+    setFileName(`${sample.title}.txt`);
     setParsedStats({
       wordCount: sample.textContent.split(/\s+/).length,
       detectedSections: ['Summary', 'Experience', 'Skills', 'Education', 'Projects'],
@@ -186,7 +216,7 @@ export const UploadAnalyzeView: React.FC<UploadAnalyzeViewProps> = ({
 
       {/* Main Two-Column Input Workspace */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* LEFT COLUMN: Resume Input */}
+        {/* LEFT COLUMN: Resume Input & Document Viewer */}
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between space-y-4">
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -200,64 +230,108 @@ export const UploadAnalyzeView: React.FC<UploadAnalyzeViewProps> = ({
               )}
             </div>
 
-            {/* Drag and Drop Zone */}
-            <div
-              onDrop={onDrop}
-              onDragOver={onDragOver}
-              onDragLeave={onDragLeave}
-              onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
-                isDragging
-                  ? 'border-blue-500 bg-blue-50/50'
-                  : 'border-slate-200 bg-slate-50 hover:bg-slate-100/70'
-              }`}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.docx,.txt"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files.length > 0) {
-                    handleFileUpload(e.target.files[0]);
-                  }
-                }}
-                className="hidden"
-              />
+            {/* Hidden File Input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx,.txt"
+              onChange={(e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                  handleFileUpload(e.target.files[0]);
+                }
+              }}
+              className="hidden"
+            />
 
-              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-600 mb-2">
-                {isParsingFile ? (
-                  <RefreshCw className="h-5 w-5 animate-spin" />
-                ) : (
-                  <Upload className="h-5 w-5" />
-                )}
-              </div>
+            {/* If a file or resume text is loaded, show Document Preview Card */}
+            {(fileName || resumeText) ? (
+              <div className="space-y-3">
+                <DocumentPreviewCard
+                  fileName={fileName || 'Loaded Resume'}
+                  fileType={parsedStats?.fileType || 'Document'}
+                  fileSize={uploadedFile?.size}
+                  extractedText={resumeText}
+                  detectedSections={parsedStats?.detectedSections}
+                  fileUrl={fileUrl}
+                  file={uploadedFile}
+                  onOpenFullscreenModal={() => setIsViewerModalOpen(true)}
+                  onClearFile={handleClearFile}
+                />
 
-              <div className="text-xs font-bold text-slate-800">
-                {fileName ? fileName : 'Click to browse or drop file here'}
+                {/* Compact Change Document Button */}
+                <div className="flex items-center justify-between pt-1 text-xs text-slate-500">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-semibold cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload a different resume file</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsViewerModalOpen(true)}
+                    className="flex items-center gap-1 text-slate-600 hover:text-slate-900 font-medium cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Open Full Document Viewer</span>
+                  </button>
+                </div>
               </div>
-              <p className="text-[10px] text-slate-400 mt-1">
-                Supports PDF, DOCX, and TXT files up to 10MB
-              </p>
-            </div>
+            ) : (
+              /* Drag and Drop Zone when no file is loaded yet */
+              <div
+                onDrop={onDrop}
+                onDragOver={onDragOver}
+                onDragLeave={onDragLeave}
+                onClick={() => fileInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
+                  isDragging
+                    ? 'border-blue-500 bg-blue-50/50'
+                    : 'border-slate-200 bg-slate-50 hover:bg-slate-100/70'
+                }`}
+              >
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 text-blue-600 mb-3 shadow-2xs">
+                  {isParsingFile ? (
+                    <RefreshCw className="h-6 w-6 animate-spin" />
+                  ) : (
+                    <Upload className="h-6 w-6" />
+                  )}
+                </div>
 
-            {/* Direct Text Editor / Fallback */}
-            <div className="mt-4">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  Extracted Resume Text
-                </span>
-                <span className="text-[10px] text-slate-400 font-mono">
-                  {resumeText.length} chars
-                </span>
+                <div className="text-sm font-bold text-slate-800">
+                  Click to browse or drop resume file here
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Supports PDF, Microsoft Word (DOCX), and Plain Text (TXT) up to 10MB
+                </p>
+                <div className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
+                  <Sparkles className="w-3 h-3 text-blue-500" />
+                  <span>Instant In-Browser Text & Page Viewer</span>
+                </div>
               </div>
-              <textarea
-                value={resumeText}
-                onChange={(e) => setResumeText(e.target.value)}
-                placeholder="Or paste your raw resume text directly here..."
-                rows={8}
-                className="w-full rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900 font-mono focus:bg-white focus:border-blue-500 focus:outline-hidden"
-              />
-            </div>
+            )}
+
+            {/* Fallback Direct Paste Text Area (Collapsible if file uploaded) */}
+            {!fileName && (
+              <div className="mt-4">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Or Paste Raw Resume Text
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {resumeText.length} chars
+                  </span>
+                </div>
+                <textarea
+                  value={resumeText}
+                  onChange={(e) => setResumeText(e.target.value)}
+                  placeholder="Or paste your raw resume text directly here..."
+                  rows={6}
+                  className="w-full rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900 font-mono focus:bg-white focus:border-blue-500 focus:outline-hidden"
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -343,6 +417,18 @@ export const UploadAnalyzeView: React.FC<UploadAnalyzeViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Fullscreen Document Viewer Modal */}
+      <DocumentViewerModal
+        isOpen={isViewerModalOpen}
+        onClose={() => setIsViewerModalOpen(false)}
+        file={uploadedFile}
+        fileUrl={fileUrl}
+        extractedText={resumeText}
+        fileName={fileName || resumeName || 'Resume Document'}
+        detectedSections={parsedStats?.detectedSections}
+        fileType={parsedStats?.fileType || 'Document'}
+      />
     </div>
   );
 };
