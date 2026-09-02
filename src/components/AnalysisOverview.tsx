@@ -20,54 +20,31 @@ import {
   FileDown,
   Upload,
   Eye,
+  Bookmark,
 } from 'lucide-react';
-import { ResumeAnalysisResult, AppUserProfile } from '../types';
+import { ResumeAnalysisResult } from '../types';
 import { NavTab } from './Sidebar';
-import { User } from 'firebase/auth';
-import { saveReportToFirestore, signInWithGoogle } from '../services/firestoreService';
+import { saveAnalysisToHistory } from '../services/storage';
 import { DocumentViewerModal } from './DocumentViewerModal';
 
 interface AnalysisOverviewProps {
   analysis: ResumeAnalysisResult;
   onNavigate: (tab: NavTab) => void;
-  currentUser?: AppUserProfile | User | null;
-  onSavedToCloud?: (reportId: string) => void;
 }
 
 export const AnalysisOverview: React.FC<AnalysisOverviewProps> = ({
   analysis,
   onNavigate,
-  currentUser,
-  onSavedToCloud,
 }) => {
   const [copiedNotification, setCopiedNotification] = useState<boolean>(false);
   const [activeSubTab, setActiveSubTab] = useState<'score' | 'ats' | 'keywords'>('score');
-  const [isSavingCloud, setIsSavingCloud] = useState<boolean>(false);
-  const [cloudSavedSuccess, setCloudSavedSuccess] = useState<boolean>(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
   const [isViewerModalOpen, setIsViewerModalOpen] = useState<boolean>(false);
 
-  const handleSaveToCloud = async () => {
-    setIsSavingCloud(true);
-    setSaveError(null);
-    try {
-      let uid = currentUser?.uid;
-      if (!uid) {
-        // Prompt sign in with Google
-        const user = await signInWithGoogle();
-        uid = user.uid;
-      }
-      const reportId = await saveReportToFirestore(uid, analysis);
-      setCloudSavedSuccess(true);
-      if (onSavedToCloud) onSavedToCloud(reportId);
-      setTimeout(() => setCloudSavedSuccess(false), 4000);
-    } catch (err: any) {
-      if (err?.code !== 'auth/popup-closed-by-user') {
-        setSaveError(err.message || 'Failed to save report to cloud');
-      }
-    } finally {
-      setIsSavingCloud(false);
-    }
+  const handleSaveReport = () => {
+    saveAnalysisToHistory(analysis);
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 3000);
   };
 
   const {
@@ -206,28 +183,21 @@ ${(keywordAnalysis?.missingKeywords || []).join(', ') || 'None identified'}
 
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={handleSaveToCloud}
-            disabled={isSavingCloud}
+            onClick={handleSaveReport}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold cursor-pointer transition-all shadow-xs ${
-              cloudSavedSuccess
+              savedSuccess
                 ? 'bg-emerald-600 text-white hover:bg-emerald-700'
                 : 'bg-blue-600 text-white hover:bg-blue-700'
             }`}
-            title="Save this analysis report to Firestore Cloud Database"
+            title="Save this analysis report to your local history"
           >
-            {isSavingCloud ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : cloudSavedSuccess ? (
+            {savedSuccess ? (
               <Check className="h-3.5 w-3.5" />
             ) : (
-              <Cloud className="h-3.5 w-3.5" />
+              <Bookmark className="h-3.5 w-3.5" />
             )}
             <span>
-              {isSavingCloud
-                ? 'Saving...'
-                : cloudSavedSuccess
-                ? 'Saved to Cloud'
-                : 'Save to Cloud'}
+              {savedSuccess ? 'Saved to History' : 'Save Report'}
             </span>
           </button>
 

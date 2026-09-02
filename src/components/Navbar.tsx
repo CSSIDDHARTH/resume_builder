@@ -13,10 +13,8 @@ import {
   ChevronDown,
   Compass,
 } from 'lucide-react';
-import { ResumeAnalysisResult, AppUserProfile } from '../types';
+import { ResumeAnalysisResult } from '../types';
 import type { NavTab } from './Sidebar';
-import { User } from 'firebase/auth';
-import { AuthButton } from './AuthButton';
 
 export type { NavTab };
 
@@ -26,19 +24,14 @@ interface NavbarProps {
   activeAnalysis: ResumeAnalysisResult | null;
   onLoadDemo: () => void;
   onOpenMobileMenu?: () => void;
-  currentUser: AppUserProfile | User | null;
-  onAuthSuccess?: (user: AppUserProfile | User) => void;
-  onSignOutSuccess?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   currentTab,
   onSelectTab,
   activeAnalysis,
+  onLoadDemo,
   onOpenMobileMenu,
-  currentUser,
-  onAuthSuccess,
-  onSignOutSuccess,
 }) => {
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
 
@@ -210,13 +203,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </nav>
 
-      {/* Right: Google Account Auth Button */}
+      {/* Right: Quick Action & Status */}
       <div className="flex items-center gap-2 shrink-0">
-        <AuthButton
-          currentUser={currentUser}
-          onAuthSuccess={onAuthSuccess}
-          onSignOutSuccess={onSignOutSuccess}
-        />
+        <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>Offline & Private Storage</span>
+        </span>
       </div>
     </header>
   );

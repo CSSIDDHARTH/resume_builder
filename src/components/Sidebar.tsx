@@ -17,8 +17,7 @@ import {
   AlertCircle,
   ExternalLink,
 } from 'lucide-react';
-import { ResumeAnalysisResult, AppUserProfile } from '../types';
-import { User } from 'firebase/auth';
+import { ResumeAnalysisResult } from '../types';
 
 export type NavTab =
   | 'dashboard'
@@ -40,7 +39,6 @@ interface SidebarProps {
   onLoadDemo: () => void;
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
-  currentUser: AppUserProfile | User | null;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -50,7 +48,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLoadDemo,
   isOpenMobile,
   onCloseMobile,
-  currentUser,
 }) => {
   const handleNavClick = (tab: NavTab) => {
     onSelectTab(tab);
@@ -258,15 +255,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </button>
 
         <div className="px-2 pt-1 text-[11px] text-slate-400 flex items-center justify-between">
-          <span>Cloud Storage:</span>
-          {currentUser ? (
-            <span className="text-emerald-400 font-semibold flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-              Google Synced
-            </span>
-          ) : (
-            <span className="text-slate-400 font-medium">Guest / Local</span>
-          )}
+          <span>Storage Mode:</span>
+          <span className="text-emerald-400 font-semibold flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            Private Local
+          </span>
         </div>
       </div>
     </div>

@@ -35,7 +35,7 @@ export const DocumentPreviewCard: React.FC<DocumentPreviewCardProps> = ({
   onOpenFullscreenModal,
   onClearFile,
 }) => {
-  const [viewMode, setViewMode] = useState<'visual' | 'text'>('visual');
+  const [viewMode, setViewMode] = useState<'visual' | 'text'>('text');
   const [copied, setCopied] = useState<boolean>(false);
 
   const isPdf = file?.type === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf');
