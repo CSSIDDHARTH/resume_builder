@@ -1,0 +1,13 @@
+{
+  "buildCommand": "vite build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/api/health", "destination": "/api/health" },
+    { "source": "/api/parse-file", "destination": "/api/parse-file" },
+    { "source": "/api/analyze", "destination": "/api/analyze" },
+    { "source": "/api/analyze-job", "destination": "/api/analyze-job" },
+    { "source": "/api/rewrite", "destination": "/api/rewrite" },
+    { "source": "/api/enhance-full-resume", "destination": "/api/enhance-full-resume" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
