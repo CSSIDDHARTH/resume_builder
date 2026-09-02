@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getGeminiClient, GEMINI_MODEL } from '../server/gemini.js';
-import { REWRITE_SCHEMA, buildRewritePrompt } from '../server/prompts.js';
+import { getGeminiClient, GEMINI_MODEL } from '../server/gemini';
+import { REWRITE_SCHEMA, buildRewritePrompt } from '../server/prompts';
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (req.method !== 'POST') {

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import multer from 'multer';
 import path from 'path';
-import { parseDocumentBuffer } from '../server/parser.js';
+import { parseDocumentBuffer } from '../server/parser';
 
 // Multer configured for Vercel (memory storage, no disk)
 const upload = multer({

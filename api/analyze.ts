@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getGeminiClient, GEMINI_MODEL } from '../server/gemini.js';
+import { getGeminiClient, GEMINI_MODEL } from '../server/gemini';
 import {
   RESUME_ANALYSIS_SCHEMA,
   buildResumeAnalysisPrompt,
-} from '../server/prompts.js';
+} from '../server/prompts';
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (req.method !== 'POST') {
