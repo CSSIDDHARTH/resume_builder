@@ -268,11 +268,34 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
           {/* 1. VISUAL PDF VIEWER (Direct Native Browser PDF Rendering) */}
           {activeTab === 'visual' && isPdf && fileUrl ? (
             <div className="w-full h-full rounded-xl overflow-hidden shadow-lg border border-slate-300 bg-slate-800">
-              <iframe
-                src={`${fileUrl}#toolbar=1&navpanes=0`}
+              <object
+                data={fileUrl}
+                type="application/pdf"
                 className="w-full h-full border-none rounded-xl"
                 title="PDF Document Viewer"
-              />
+              >
+                <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center text-slate-300 bg-slate-800 space-y-3">
+                  <FileText className="w-12 h-12 text-slate-400" />
+                  <p className="text-sm font-bold text-white">PDF Document Loaded</p>
+                  <p className="text-xs text-slate-400 max-w-sm leading-relaxed">
+                    Your browser does not support inline PDF plugins for local blobs. You can view the formatted paper version or download the file.
+                  </p>
+                  <div className="flex items-center gap-2 pt-2">
+                    <button
+                      onClick={() => setActiveTab('formatted')}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs cursor-pointer"
+                    >
+                      View Formatted Paper View
+                    </button>
+                    <button
+                      onClick={handleDownloadOriginal}
+                      className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold rounded-xl text-xs cursor-pointer"
+                    >
+                      Download PDF
+                    </button>
+                  </div>
+                </div>
+              </object>
             </div>
           ) : null}
 

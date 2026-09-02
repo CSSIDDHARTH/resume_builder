@@ -225,8 +225,43 @@ export async function saveReportToFirestore(
     updatedAt: new Date().toISOString(),
   };
 
+function isDemoOrCustomUser(userId: string): boolean {
+  return !userId || userId.startsWith('demo-user-') || userId.startsWith('profile-');
+}
+
+/**
+ * Save a full resume analysis report to Firestore (with localStorage fallback)
+ */
+export async function saveReportToFirestore(
+  userId: string,
+  analysis: ResumeAnalysisResult,
+  customTitle?: string
+): Promise<string> {
+  if (!userId) throw new Error('User must be authenticated to save reports to cloud');
+
+  const reportId =
+    analysis.id && analysis.id.startsWith('rep_')
+      ? analysis.id
+      : 'rep_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+
+  const title =
+    customTitle ||
+    `${analysis.targetRole || 'Resume Analysis'} - ${analysis.resumeName || 'Report'}`;
+
+  const reportData = {
+    userId,
+    title,
+    targetRole: analysis.targetRole || 'Target Role',
+    targetCompany: analysis.targetCompany || '',
+    overallScore: analysis.scores?.overall || 0,
+    atsScore: analysis.scores?.atsCompatibility || 0,
+    analysisResult: analysis,
+    createdAt: analysis.timestamp || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
   // If demo user or offline, firestore operations are bypassed safely
-  if (userId.startsWith('demo-user-')) {
+  if (isDemoOrCustomUser(userId)) {
     return reportId;
   }
 
@@ -247,7 +282,7 @@ export async function fetchUserReports(userId: string): Promise<SavedCloudReport
   if (!userId) return [];
 
   // For demo users, map local analysis history
-  if (userId.startsWith('demo-user-')) {
+  if (isDemoOrCustomUser(userId)) {
     const localHistory = getAnalysisHistory();
     return localHistory.map((item) => ({
       id: item.id,
@@ -316,7 +351,7 @@ export function subscribeToUserReports(
     return () => {};
   }
 
-  if (userId.startsWith('demo-user-')) {
+  if (isDemoOrCustomUser(userId)) {
     const localHistory = getAnalysisHistory();
     onReportsUpdate(
       localHistory.map((item) => ({

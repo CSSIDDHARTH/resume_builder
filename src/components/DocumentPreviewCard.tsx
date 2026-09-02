@@ -148,11 +148,27 @@ export const DocumentPreviewCard: React.FC<DocumentPreviewCardProps> = ({
         {/* 1. VISUAL PDF VIEWER */}
         {viewMode === 'visual' && isPdf && fileUrl ? (
           <div className="w-full h-80 bg-slate-800 relative">
-            <iframe
-              src={`${fileUrl}#toolbar=0&navpanes=0`}
+            <object
+              data={fileUrl}
+              type="application/pdf"
               className="w-full h-full border-none"
               title="Document Preview"
-            />
+            >
+              <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-slate-300 bg-slate-800">
+                <FileText className="w-10 h-10 text-slate-400 mb-2" />
+                <p className="text-xs font-bold text-white">PDF Document Loaded</p>
+                <p className="text-[11px] text-slate-400 mt-1 max-w-xs">
+                  Click below to open the interactive document viewer.
+                </p>
+                <button
+                  type="button"
+                  onClick={onOpenFullscreenModal}
+                  className="mt-3 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs cursor-pointer"
+                >
+                  Open Document Viewer
+                </button>
+              </div>
+            </object>
             <div className="absolute bottom-2 right-2">
               <button
                 type="button"
