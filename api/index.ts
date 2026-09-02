@@ -16,13 +16,50 @@ function getGeminiClient(): GoogleGenAI {
   return new GoogleGenAI({ apiKey });
 }
 
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+
+async function callGeminiWithFallback(ai: GoogleGenAI, options: any) {
+  let lastErr = null;
+  for (const model of GEMINI_MODELS) {
+    try {
+      const response = await ai.models.generateContent({
+        ...options,
+        model,
+      });
+      if (response && response.text) {
+        return response;
+      }
+    } catch (err: any) {
+      console.warn(`Gemini model ${model} failed (${err?.message || err}). Trying fallback model...`);
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error('All Gemini model fallbacks failed. Please check your API key or retry in a moment.');
+}
 
 // ─── Inline PDF parser ────────────────────────────────────────────────────────
 
 async function extractPdfText(buffer: Buffer): Promise<string> {
   try {
     const pdfModule: any = await import('pdf-parse');
+    
+    // Strategy 1: pdf-parse v2 PDFParse class
+    const ParserClass = pdfModule.PDFParse || pdfModule.default?.PDFParse;
+    if (typeof ParserClass === 'function') {
+      const parser = new ParserClass({ data: buffer, verbosity: 0 });
+      try {
+        const textResult = await parser.getText();
+        if (textResult && typeof textResult.text === 'string' && textResult.text.trim()) {
+          return textResult.text;
+        }
+      } finally {
+        if (parser && typeof parser.destroy === 'function') {
+          await parser.destroy().catch(() => {});
+        }
+      }
+    }
+
+    // Strategy 2: pdf-parse v1 function interop
     const fn =
       typeof pdfModule.default === 'function'
         ? pdfModule.default
@@ -31,13 +68,14 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
         : null;
     if (typeof fn === 'function') {
       const data = await fn(buffer);
-      if (data && typeof data.text === 'string') return data.text;
+      if (data && typeof data.text === 'string' && data.text.trim()) return data.text;
     }
   } catch (err: any) {
-    console.error('PDF parse error:', err?.message);
+    console.error('Server PDF parse error:', err?.message || err);
   }
+
   throw new Error(
-    'Failed to parse PDF. The document may be password-protected or a scanned image. Try a text-based PDF or DOCX.'
+    'Failed to parse PDF. The document may be password-protected or a scanned image. Please try a text-based PDF or DOCX.'
   );
 }
 
@@ -160,15 +198,13 @@ app.post('/api/analyze', async (req: Request, res: Response): Promise<void> => {
     }
 
     const ai = getGeminiClient();
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
+    const response = await callGeminiWithFallback(ai, {
       contents: buildResumeAnalysisPrompt(resumeText, jobDescription || ''),
       config: {
         systemInstruction: 'You are an authoritative, evidence-based technical resume auditor and ATS evaluator. Always output strict JSON matching the schema with zero metric hallucinations.',
         responseMimeType: 'application/json',
         responseSchema: RESUME_ANALYSIS_SCHEMA as any,
         temperature: 0.2,
-        thinkingConfig: { thinkingBudget: 0 },
       },
     });
 
@@ -238,10 +274,9 @@ app.post('/api/analyze-job', async (req: Request, res: Response): Promise<void> 
       return;
     }
     const ai = getGeminiClient();
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
+    const response = await callGeminiWithFallback(ai, {
       contents: `Analyze this job description and extract structured technical and role specifications:\n--- JOB DESCRIPTION ---\n${jobDescription}`,
-      config: { responseMimeType: 'application/json', responseSchema: JOB_ANALYZER_SCHEMA as any, temperature: 0.2, thinkingConfig: { thinkingBudget: 0 } },
+      config: { responseMimeType: 'application/json', responseSchema: JOB_ANALYZER_SCHEMA as any, temperature: 0.2 },
     });
     if (!response.text) throw new Error('Empty response from AI engine');
     res.json({ success: true, data: JSON.parse(response.text) });
@@ -261,10 +296,9 @@ app.post('/api/rewrite', async (req: Request, res: Response): Promise<void> => {
     const validStyles = ['concise', 'technical', 'impact', 'ats'];
     const chosenStyle = validStyles.includes(style) ? style : 'impact';
     const ai = getGeminiClient();
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
+    const response = await callGeminiWithFallback(ai, {
       contents: buildRewritePrompt(originalText, sectionType || 'bullet', chosenStyle, jobContext),
-      config: { systemInstruction: 'You are an expert resume writer. Never invent facts or numbers.', responseMimeType: 'application/json', responseSchema: REWRITE_SCHEMA as any, temperature: 0.3, thinkingConfig: { thinkingBudget: 0 } },
+      config: { systemInstruction: 'You are an expert resume writer. Never invent facts or numbers.', responseMimeType: 'application/json', responseSchema: REWRITE_SCHEMA as any, temperature: 0.3 },
     });
     if (!response.text) throw new Error('AI returned an empty response.');
     const parsed = JSON.parse(response.text);
@@ -285,10 +319,9 @@ app.post('/api/enhance-full-resume', async (req: Request, res: Response): Promis
     const validStyles = ['impact_metrics', 'ats_maximized', 'technical_depth', 'executive_leadership'];
     const chosenStyle = validStyles.includes(style) ? style : 'impact_metrics';
     const ai = getGeminiClient();
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
+    const response = await callGeminiWithFallback(ai, {
       contents: buildResumeEnhancementPrompt(resumeText, jobDescription || '', targetRole || 'Target Role', chosenStyle, analysisContext || ''),
-      config: { systemInstruction: 'You are an authoritative ATS systems architect and principal executive resume writer. Output strict JSON matching the schema.', responseMimeType: 'application/json', responseSchema: RESUME_ENHANCEMENT_SCHEMA as any, temperature: 0.25, thinkingConfig: { thinkingBudget: 0 } },
+      config: { systemInstruction: 'You are an authoritative ATS systems architect and principal executive resume writer. Output strict JSON matching the schema.', responseMimeType: 'application/json', responseSchema: RESUME_ENHANCEMENT_SCHEMA as any, temperature: 0.25 },
     });
     if (!response.text) throw new Error('AI engine returned an empty response.');
     const parsed = JSON.parse(response.text);
