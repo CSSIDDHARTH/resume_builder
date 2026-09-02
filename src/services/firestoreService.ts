@@ -70,6 +70,38 @@ export function signInAsDemoUser(customName?: string): AppUserProfile {
 }
 
 /**
+ * Sign in with a Custom Profile name and email
+ */
+export function signInWithCustomProfile(
+  name: string,
+  email: string,
+  photoURL?: string
+): AppUserProfile {
+  const cleanName = name.trim() || 'Candidate';
+  const cleanEmail = email.trim() || 'user@resumesense.ai';
+  const avatar =
+    photoURL ||
+    `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80`;
+
+  const profileUser: AppUserProfile = {
+    uid: 'profile-' + (cleanEmail ? btoa(cleanEmail.toLowerCase()).replace(/=/g, '') : Math.random().toString(36).substring(2, 9)),
+    email: cleanEmail,
+    displayName: cleanName,
+    photoURL: avatar,
+    isDemo: true,
+  };
+
+  try {
+    localStorage.setItem(DEMO_USER_STORAGE_KEY, JSON.stringify(profileUser));
+  } catch (e) {
+    console.warn('Could not persist custom profile to localStorage:', e);
+  }
+
+  notifyAuthListeners(profileUser);
+  return profileUser;
+}
+
+/**
  * Sign in with Google Popup with enriched error detection
  */
 export async function signInWithGoogle(): Promise<User> {
