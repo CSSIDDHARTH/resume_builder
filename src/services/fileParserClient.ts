@@ -1,26 +1,23 @@
+import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
 import { parseResumeFile, ParseFileResponse } from './api';
 
+// Point the worker at the matching CDN URL for the installed version.
+// This avoids bundling the worker (which can conflict with Vite) while
+// guaranteeing the version always matches the installed pdfjs-dist.
+if (typeof window !== 'undefined' && !(pdfjsLib as any).__workerConfigured) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+  (pdfjsLib as any).__workerConfigured = true;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 const COMMON_SECTION_HEADINGS = [
-  'summary',
-  'professional summary',
-  'objective',
-  'experience',
-  'work experience',
-  'employment history',
-  'education',
-  'skills',
-  'technical skills',
-  'projects',
-  'certifications',
-  'achievements',
-  'awards',
-  'leadership',
-  'publications',
-  'volunteer',
-  'extracurricular',
-  'languages',
-  'interests',
+  'summary', 'professional summary', 'objective', 'experience',
+  'work experience', 'employment history', 'education', 'skills',
+  'technical skills', 'projects', 'certifications', 'achievements',
+  'awards', 'leadership', 'publications', 'volunteer',
+  'extracurricular', 'languages', 'interests',
 ];
 
 function cleanResumeText(raw: string): string {
@@ -34,108 +31,79 @@ function cleanResumeText(raw: string): string {
 }
 
 function detectResumeSections(text: string): string[] {
-  const lines = text.split('\n');
   const found = new Set<string>();
-
-  for (const line of lines) {
-    const trimmed = line.trim().toLowerCase().replace(/[:\-_#*]/g, '').trim();
-    if (trimmed.length > 2 && trimmed.length < 35) {
-      for (const section of COMMON_SECTION_HEADINGS) {
-        if (trimmed === section || trimmed.startsWith(section + ' ') || trimmed.endsWith(' ' + section)) {
-          found.add(section);
-        }
+  for (const line of text.split('\n')) {
+    const t = line.trim().toLowerCase().replace(/[:\-_#*]/g, '').trim();
+    if (t.length > 2 && t.length < 35) {
+      for (const s of COMMON_SECTION_HEADINGS) {
+        if (t === s || t.startsWith(s + ' ') || t.endsWith(' ' + s)) found.add(s);
       }
     }
   }
-
   return Array.from(found);
 }
 
-function buildParsedResponse(text: string, fileType: string, originalFileName: string): ParseFileResponse {
+function buildResponse(text: string, fileType: string, originalFileName: string): ParseFileResponse {
   const cleanedText = cleanResumeText(text);
   if (!cleanedText || cleanedText.length < 30) {
-    throw new Error('Insufficient or unreadable text found in the document. Please try a text-based document.');
+    throw new Error(
+      'This document appears to have insufficient or unreadable text. Please try a text-based document or paste your resume text directly.'
+    );
   }
-
-  const words = cleanedText.trim().split(/\s+/).filter(Boolean);
-  const detectedSections = detectResumeSections(cleanedText);
-
   return {
     text: cleanedText,
-    wordCount: words.length,
+    wordCount: cleanedText.trim().split(/\s+/).filter(Boolean).length,
     charCount: cleanedText.length,
-    detectedSections,
+    detectedSections: detectResumeSections(cleanedText),
     fileType,
     originalFileName,
   };
 }
 
-/**
- * Dynamically loads PDF.js from cdnjs if not already present on window
- */
-async function loadPdfJs(): Promise<any> {
-  if ((window as any).pdfjsLib) {
-    return (window as any).pdfjsLib;
-  }
+// ─── PDF parsing via pdfjs-dist (runs entirely in the browser) ─────────────────
 
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-    script.onload = () => {
-      const pdfjs = (window as any).pdfjsLib;
-      if (pdfjs) {
-        pdfjs.GlobalWorkerOptions.workerSrc =
-          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        resolve(pdfjs);
-      } else {
-        reject(new Error('PDF.js failed to initialize on window object.'));
-      }
-    };
-    script.onerror = () => reject(new Error('Failed to load PDF.js script from CDN.'));
-    document.head.appendChild(script);
-  });
-}
-
-/**
- * Extracts raw text from a PDF file directly inside the browser using PDF.js
- */
 async function parsePdfInBrowser(file: File): Promise<string> {
-  const pdfjsLib = await loadPdfJs();
   const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  
+  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+  const pdf = await loadingTask.promise;
+
   let fullText = '';
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    const pageStrings = content.items.map((item: any) => item.str || '');
-    fullText += pageStrings.join(' ') + '\n';
+    const pageText = content.items
+      .map((item: any) => ('str' in item ? item.str : ''))
+      .join(' ');
+    fullText += pageText + '\n';
   }
 
+  await pdf.destroy();
   return fullText;
 }
 
+// ─── Main hybrid parser ────────────────────────────────────────────────────────
+
 /**
- * Main hybrid document parser:
- * 1. TXT/MD files: Parsed 100% in browser via FileReader
- * 2. DOCX files: Parsed 100% in browser via mammoth
- * 3. PDF files: Tries browser PDF.js extraction first, falls back to server API if needed
+ * Parses any uploaded resume document entirely in the browser:
+ *  - TXT / MD  → FileReader.readAsText   (instant, no network)
+ *  - DOCX      → mammoth                 (instant, no network)
+ *  - PDF       → pdf.js                  (instant, no network)
+ * Falls back to the server /api/parse-file if all browser methods fail.
  */
 export async function parseFileHybrid(file: File): Promise<ParseFileResponse> {
-  const fileName = file.name;
-  const lowerName = fileName.toLowerCase();
-  const mimeType = file.type || '';
+  const lowerName = file.name.toLowerCase();
+  const mime = file.type || '';
 
-  // 1. Plain Text / Markdown
-  if (mimeType.startsWith('text/') || lowerName.endsWith('.txt') || lowerName.endsWith('.md')) {
+  // 1. Plain text / markdown
+  if (mime.startsWith('text/') || lowerName.endsWith('.txt') || lowerName.endsWith('.md')) {
     const text = await file.text();
-    return buildParsedResponse(text, 'txt', fileName);
+    return buildResponse(text, 'txt', file.name);
   }
 
-  // 2. DOCX document
+  // 2. DOCX / DOC via mammoth
   if (
-    mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-    mimeType === 'application/msword' ||
+    mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    mime === 'application/msword' ||
     lowerName.endsWith('.docx') ||
     lowerName.endsWith('.doc')
   ) {
@@ -143,33 +111,26 @@ export async function parseFileHybrid(file: File): Promise<ParseFileResponse> {
       const arrayBuffer = await file.arrayBuffer();
       const result = await mammoth.extractRawText({ arrayBuffer });
       if (result.value && result.value.trim().length > 30) {
-        return buildParsedResponse(result.value, 'docx', fileName);
+        return buildResponse(result.value, 'docx', file.name);
       }
     } catch (err) {
-      console.warn('Browser mammoth DOCX parse error, trying server fallback:', err);
+      console.warn('mammoth DOCX parse failed, trying server:', err);
     }
   }
 
-  // 3. PDF document — Try browser PDF parsing first
-  if (mimeType === 'application/pdf' || lowerName.endsWith('.pdf')) {
+  // 3. PDF via pdfjs-dist (runs in browser, no server call needed)
+  if (mime === 'application/pdf' || lowerName.endsWith('.pdf')) {
     try {
       const pdfText = await parsePdfInBrowser(file);
       if (pdfText && pdfText.trim().length > 30) {
-        return buildParsedResponse(pdfText, 'pdf', fileName);
+        return buildResponse(pdfText, 'pdf', file.name);
       }
-    } catch (browserErr) {
-      console.warn('Browser PDF.js extraction failed or timed out, trying server API fallback:', browserErr);
+      throw new Error('PDF text extraction returned empty content.');
+    } catch (err) {
+      console.warn('Browser PDF parse failed, trying server fallback:', err);
     }
   }
 
-  // 4. Server API fallback for PDF or complex formats
-  try {
-    return await parseResumeFile(file);
-  } catch (apiErr: any) {
-    console.error('Server API file parse error:', apiErr);
-    throw new Error(
-      apiErr.message ||
-        'Unable to parse this document. Please ensure it is a valid text-based PDF, DOCX, or TXT file, or paste your resume text into the text area below.'
-    );
-  }
+  // 4. Server fallback — only reached if browser parsing above fails
+  return parseResumeFile(file);
 }
