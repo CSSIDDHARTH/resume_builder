@@ -1,0 +1,54 @@
+{
+  "entities": {
+    "users": {
+      "title": "User Profiles",
+      "description": "User account documents stored by user UID",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastLoginAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "reports": {
+      "title": "Saved Resume Analysis Reports",
+      "description": "Resume audit reports saved by authenticated users",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "targetRole": { "type": "string" },
+        "targetCompany": { "type": "string" },
+        "analysisResult": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "overallScore": { "type": "number" },
+        "atsScore": { "type": "number" }
+      },
+      "required": ["userId", "title", "analysisResult", "createdAt"]
+    },
+    "enhancedResumes": {
+      "title": "Saved AI Enhanced Resumes",
+      "description": "AI transformed resumes and before/after comparisons saved by users",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "targetRole": { "type": "string" },
+        "targetCompany": { "type": "string" },
+        "enhancementStyle": { "type": "string" },
+        "enhancedResult": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "enhancedResult", "createdAt"]
+    }
+  },
+  "rules": {
+    "users": "Users can only read and write their own user profile document matching their auth.uid",
+    "reports": "Users can only create, read, update, and delete reports where resource.data.userId == request.auth.uid",
+    "enhancedResumes": "Users can only create, read, update, and delete enhanced resumes where resource.data.userId == request.auth.uid"
+  }
+}

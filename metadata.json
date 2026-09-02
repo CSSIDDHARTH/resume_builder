@@ -1,0 +1,6 @@
+{
+  "name": "AI Resume Analyzer",
+  "description": "Production-grade AI resume analyzer and ATS job-match platform with evidence-based scoring, skill gap analysis, AI rewriting, and interview preparation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
