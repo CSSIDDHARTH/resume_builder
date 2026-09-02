@@ -14,6 +14,7 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { parseResumeFile, analyzeResume } from '../services/api';
+import { parseFileHybrid } from '../services/fileParserClient';
 import { ResumeAnalysisResult, SavedResume } from '../types';
 import { SAMPLE_JOBS, SAMPLE_RESUMES } from '../data/demoData';
 
@@ -67,7 +68,7 @@ export const UploadAnalyzeView: React.FC<UploadAnalyzeViewProps> = ({
     setResumeName(file.name.replace(/\.[^/.]+$/, ''));
 
     try {
-      const parsed = await parseResumeFile(file);
+      const parsed = await parseFileHybrid(file);
       setResumeText(parsed.text);
       setParsedStats({
         wordCount: parsed.wordCount,
