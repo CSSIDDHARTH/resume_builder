@@ -19,32 +19,52 @@ import {
   Loader2,
   FileDown,
   Upload,
-  Eye,
-  Bookmark,
 } from 'lucide-react';
 import { ResumeAnalysisResult } from '../types';
 import { NavTab } from './Sidebar';
-import { saveAnalysisToHistory } from '../services/storage';
-import { DocumentViewerModal } from './DocumentViewerModal';
+import { User } from 'firebase/auth';
+import { saveReportToFirestore, signInWithGoogle } from '../services/firestoreService';
 
 interface AnalysisOverviewProps {
   analysis: ResumeAnalysisResult;
   onNavigate: (tab: NavTab) => void;
+  currentUser?: User | null;
+  onSavedToCloud?: (reportId: string) => void;
 }
 
 export const AnalysisOverview: React.FC<AnalysisOverviewProps> = ({
   analysis,
   onNavigate,
+  currentUser,
+  onSavedToCloud,
 }) => {
   const [copiedNotification, setCopiedNotification] = useState<boolean>(false);
   const [activeSubTab, setActiveSubTab] = useState<'score' | 'ats' | 'keywords'>('score');
-  const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
-  const [isViewerModalOpen, setIsViewerModalOpen] = useState<boolean>(false);
+  const [isSavingCloud, setIsSavingCloud] = useState<boolean>(false);
+  const [cloudSavedSuccess, setCloudSavedSuccess] = useState<boolean>(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const handleSaveReport = () => {
-    saveAnalysisToHistory(analysis);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+  const handleSaveToCloud = async () => {
+    setIsSavingCloud(true);
+    setSaveError(null);
+    try {
+      let uid = currentUser?.uid;
+      if (!uid) {
+        // Prompt sign in with Google
+        const user = await signInWithGoogle();
+        uid = user.uid;
+      }
+      const reportId = await saveReportToFirestore(uid, analysis);
+      setCloudSavedSuccess(true);
+      if (onSavedToCloud) onSavedToCloud(reportId);
+      setTimeout(() => setCloudSavedSuccess(false), 4000);
+    } catch (err: any) {
+      if (err?.code !== 'auth/popup-closed-by-user') {
+        setSaveError(err.message || 'Failed to save report to cloud');
+      }
+    } finally {
+      setIsSavingCloud(false);
+    }
   };
 
   const {
@@ -183,21 +203,28 @@ ${(keywordAnalysis?.missingKeywords || []).join(', ') || 'None identified'}
 
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={handleSaveReport}
+            onClick={handleSaveToCloud}
+            disabled={isSavingCloud}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold cursor-pointer transition-all shadow-xs ${
-              savedSuccess
+              cloudSavedSuccess
                 ? 'bg-emerald-600 text-white hover:bg-emerald-700'
                 : 'bg-blue-600 text-white hover:bg-blue-700'
             }`}
-            title="Save this analysis report to your local history"
+            title="Save this analysis report to Firestore Cloud Database"
           >
-            {savedSuccess ? (
+            {isSavingCloud ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : cloudSavedSuccess ? (
               <Check className="h-3.5 w-3.5" />
             ) : (
-              <Bookmark className="h-3.5 w-3.5" />
+              <Cloud className="h-3.5 w-3.5" />
             )}
             <span>
-              {savedSuccess ? 'Saved to History' : 'Save Report'}
+              {isSavingCloud
+                ? 'Saving...'
+                : cloudSavedSuccess
+                ? 'Saved to Cloud'
+                : 'Save to Cloud'}
             </span>
           </button>
 
@@ -207,15 +234,6 @@ ${(keywordAnalysis?.missingKeywords || []).join(', ') || 'None identified'}
           >
             <Sparkles className="h-3.5 w-3.5" />
             <span>AI Enhance</span>
-          </button>
-
-          <button
-            onClick={() => setIsViewerModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs cursor-pointer transition-colors"
-            title="Inspect original resume document"
-          >
-            <Eye className="h-3.5 w-3.5 text-blue-600" />
-            <span>View Document</span>
           </button>
 
           <button
@@ -603,18 +621,6 @@ ${(keywordAnalysis?.missingKeywords || []).join(', ') || 'None identified'}
           </div>
         </div>
       )}
-
-      {/* Document Viewer Modal */}
-      <DocumentViewerModal
-        isOpen={isViewerModalOpen}
-        onClose={() => setIsViewerModalOpen(false)}
-        file={null}
-        fileUrl={null}
-        extractedText={analysis.rawResumeTextSnippet || 'No raw text snippet available for this report.'}
-        fileName={analysis.resumeName || 'Resume Document'}
-        detectedSections={analysis.sectionAnalyses?.map((s) => s.sectionName) || []}
-        fileType="Resume Document"
-      />
     </div>
   );
 };

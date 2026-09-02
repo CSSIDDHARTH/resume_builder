@@ -1,18 +1,23 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import React, { useState, useEffect } from 'react';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
+import { LandingPage } from './components/LandingPage';
 import { DashboardView } from './components/DashboardView';
 import { UploadAnalyzeView } from './components/UploadAnalyzeView';
 import { AnalysisOverview } from './components/AnalysisOverview';
-import { AIEnhanceComparisonView } from './components/AIEnhanceComparisonView';
 import { SkillGapView } from './components/SkillGapView';
 import { ResumeImprovementsView } from './components/ResumeImprovementsView';
 import { AIRewriterView } from './components/AIRewriterView';
+import { AIEnhanceComparisonView } from './components/AIEnhanceComparisonView';
 import { InterviewPrepView } from './components/InterviewPrepView';
 import { ResumeManagerView } from './components/ResumeManagerView';
 import { HistoryView } from './components/HistoryView';
 import { SettingsView } from './components/SettingsView';
-import { LandingPage } from './components/LandingPage';
 
 import {
   ResumeAnalysisResult,
@@ -21,16 +26,17 @@ import {
   EnhancedResumeResult,
 } from './types';
 import {
-  getStoredResumes,
-  getAnalysisHistory,
-  saveAnalysisToHistory,
   getActiveAnalysis,
   setActiveAnalysis,
-  saveResumeProfile,
-  resetToDemoData,
+  getStoredResumes,
+  saveResume,
+  getAnalysisHistory,
+  saveAnalysisToHistory,
 } from './services/storage';
 import { DEMO_PRECOMPUTED_REPORT, DEMO_ENHANCED_RESUME, SAMPLE_RESUMES } from './data/demoData';
 import { analyzeResume } from './services/api';
+import { subscribeToAuth, saveReportToFirestore } from './services/firestoreService';
+import { User } from 'firebase/auth';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
@@ -40,6 +46,7 @@ export default function App() {
   const [history, setHistory] = useState<AnalysisHistoryItem[]>([]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isReAnalyzing, setIsReAnalyzing] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   
   // Cross-component rewriter handoff state
   const [rewriterInitialText, setRewriterInitialText] = useState<string>('');
@@ -55,6 +62,13 @@ export default function App() {
     setHistory(storedHistory);
     setActiveAnalysisState(storedActive || DEMO_PRECOMPUTED_REPORT);
     setEnhancedResult(DEMO_ENHANCED_RESUME);
+
+    // Subscribe to Firebase Auth
+    const unsubscribe = subscribeToAuth((user) => {
+      setCurrentUser(user);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const handleSelectTab = (tab: NavTab) => {
@@ -62,13 +76,21 @@ export default function App() {
     setIsMobileMenuOpen(false);
   };
 
-  const handleAnalysisComplete = (result: ResumeAnalysisResult) => {
+  const handleAnalysisComplete = async (result: ResumeAnalysisResult) => {
     setActiveAnalysisState(result);
     setActiveAnalysis(result);
     saveAnalysisToHistory(result);
     setHistory(getAnalysisHistory());
     setEnhancedResult(null); // Reset until user enhances
     setCurrentTab('analysis');
+
+    if (currentUser) {
+      try {
+        await saveReportToFirestore(currentUser.uid, result);
+      } catch (cloudErr) {
+        console.warn('Auto-save to Firestore failed:', cloudErr);
+      }
+    }
   };
 
   const handleLoadDemo = () => {
@@ -86,24 +108,20 @@ export default function App() {
     try {
       const newAnalysis = await analyzeResume(
         enhancedText,
-        activeAnalysis.targetRole || 'Target Role',
-        `${activeAnalysis.resumeName} (AI Enhanced)`
+        activeAnalysis.rawJobDescriptionSnippet || '',
+        `${activeAnalysis.resumeName} (Enhanced)`
       );
       handleAnalysisComplete(newAnalysis);
     } catch (err) {
-      console.error('Re-analysis failed:', err);
+      console.error('Re-analysis error:', err);
     } finally {
       setIsReAnalyzing(false);
     }
   };
 
-  const handleSaveProfileFromEnhance = (name: string, content: string) => {
-    saveResumeProfile(name, content, 'txt');
+  const handleSaveProfileFromEnhance = (profile: SavedResume) => {
+    saveResume(profile);
     setSavedResumes(getStoredResumes());
-  };
-
-  const handleSelectResumeForAnalysis = (resume: SavedResume) => {
-    setCurrentTab('upload');
   };
 
   const handleSelectHistoryItem = (item: AnalysisHistoryItem) => {
@@ -118,26 +136,30 @@ export default function App() {
     setCurrentTab('rewriter');
   };
 
-  const handleRefreshHistory = () => {
-    setHistory(getAnalysisHistory());
+  const handleSelectResumeForAnalysis = (resume: SavedResume) => {
+    setCurrentTab('upload');
   };
 
   const handleRefreshResumes = () => {
     setSavedResumes(getStoredResumes());
   };
 
+  const handleRefreshHistory = () => {
+    setHistory(getAnalysisHistory());
+  };
+
   const handleResetToDemo = () => {
-    resetToDemoData();
-    setSavedResumes(getStoredResumes());
+    localStorage.clear();
+    setSavedResumes(SAMPLE_RESUMES);
     setHistory(getAnalysisHistory());
     setActiveAnalysisState(DEMO_PRECOMPUTED_REPORT);
-    setEnhancedResult(DEMO_ENHANCED_RESUME);
+    setActiveAnalysis(DEMO_PRECOMPUTED_REPORT);
     setCurrentTab('dashboard');
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-100 font-sans text-slate-900 antialiased">
-      {/* Left Sidebar Navigation */}
+    <div className="flex h-screen w-full bg-[#f8fafc] font-sans text-slate-900 overflow-hidden">
+      {/* High Density Dark Slate Sidebar */}
       <Sidebar
         currentTab={currentTab}
         onSelectTab={handleSelectTab}
@@ -145,6 +167,7 @@ export default function App() {
         onLoadDemo={handleLoadDemo}
         isOpenMobile={isMobileMenuOpen}
         onCloseMobile={() => setIsMobileMenuOpen(false)}
+        currentUser={currentUser}
       />
 
       {/* Main Content Area with Sticky Header */}
@@ -155,6 +178,9 @@ export default function App() {
           activeAnalysis={activeAnalysis}
           onLoadDemo={handleLoadDemo}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
+          currentUser={currentUser}
+          onAuthSuccess={(user) => setCurrentUser(user)}
+          onSignOutSuccess={() => setCurrentUser(null)}
         />
 
         <main className="flex-1 overflow-y-auto bg-[#f8fafc] p-4 sm:p-6 lg:p-8 space-y-6">
@@ -183,6 +209,10 @@ export default function App() {
             <AnalysisOverview
               analysis={activeAnalysis}
               onNavigate={handleSelectTab}
+              currentUser={currentUser}
+              onSavedToCloud={() => {
+                handleRefreshHistory();
+              }}
             />
           )}
 
@@ -241,6 +271,7 @@ export default function App() {
               }}
               onNavigate={handleSelectTab}
               onLoadDemo={handleLoadDemo}
+              currentUser={currentUser}
             />
           )}
 
