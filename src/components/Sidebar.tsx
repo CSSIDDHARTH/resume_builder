@@ -12,16 +12,13 @@ import {
   FileText,
   Menu,
   X,
-  Compass,
   CheckCircle2,
   AlertCircle,
-  ExternalLink,
 } from 'lucide-react';
 import { ResumeAnalysisResult } from '../types';
 import { User } from 'firebase/auth';
 
 export type NavTab =
-  | 'landing'
   | 'dashboard'
   | 'upload'
   | 'analysis'
@@ -58,6 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onCloseMobile();
   };
 
+
   const navItemClass = (tab: NavTab) =>
     `flex items-center gap-3 px-3 py-2 rounded-md text-xs font-medium cursor-pointer transition-all ${
       currentTab === tab
@@ -71,7 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div>
         <div className="p-5 border-b border-slate-800 flex items-center justify-between">
           <button
-            onClick={() => handleNavClick('landing')}
+            onClick={() => handleNavClick('dashboard')}
             className="flex items-center gap-3 text-left group cursor-pointer"
           >
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-extrabold text-white text-base shadow-sm group-hover:bg-blue-500 transition-colors">
@@ -124,14 +122,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span>Analyze Resume</span>
           </button>
 
-          <button
-            id="nav-tab-landing"
-            onClick={() => handleNavClick('landing')}
-            className={`w-full ${navItemClass('landing')}`}
-          >
-            <Compass className="w-4 h-4 text-slate-400 shrink-0" />
-            <span>Feature Overview</span>
-          </button>
 
           {/* Active Report Section */}
           <div className="pt-4 px-3 pb-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center justify-between">

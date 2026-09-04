@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
-import { LandingPage } from './components/LandingPage';
+
 import { DashboardView } from './components/DashboardView';
 import { UploadAnalyzeView } from './components/UploadAnalyzeView';
 import { AnalysisOverview } from './components/AnalysisOverview';
@@ -184,9 +184,7 @@ export default function App() {
         />
 
         <main className="flex-1 overflow-y-auto bg-[#f8fafc] p-4 sm:p-6 lg:p-8 space-y-6">
-          {currentTab === 'landing' && (
-            <LandingPage onNavigate={handleSelectTab} onTryDemo={handleLoadDemo} />
-          )}
+
 
           {currentTab === 'dashboard' && (
             <DashboardView

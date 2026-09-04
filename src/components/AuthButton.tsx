@@ -9,14 +9,19 @@ import {
   Sparkles,
   AlertCircle,
   Loader2,
+  History,
+  FolderKanban,
+  Upload,
 } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { signInWithGoogle, logOut } from '../services/firestoreService';
+import { NavTab } from './Sidebar';
 
 interface AuthButtonProps {
   currentUser: User | null;
   onAuthSuccess?: (user: User) => void;
   onSignOutSuccess?: () => void;
+  onNavigate?: (tab: NavTab) => void;
   className?: string;
   variant?: 'compact' | 'full' | 'banner';
 }
@@ -25,6 +30,7 @@ export const AuthButton: React.FC<AuthButtonProps> = ({
   currentUser,
   onAuthSuccess,
   onSignOutSuccess,
+  onNavigate,
   className = '',
   variant = 'compact',
 }) => {
@@ -161,6 +167,43 @@ export const AuthButton: React.FC<AuthButtonProps> = ({
                   <span>Authenticated via Google</span>
                 </div>
               </div>
+
+              {onNavigate && (
+                <div className="px-2 py-1.5 border-b border-slate-100 space-y-0.5">
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      onNavigate('history');
+                    }}
+                    className="w-full px-3 py-2 text-left text-slate-700 hover:bg-slate-50 hover:text-blue-600 rounded-lg flex items-center gap-2 cursor-pointer font-medium transition-colors"
+                  >
+                    <History className="w-3.5 h-3.5 text-blue-500" />
+                    <span>My Saved Audits & Uploads</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      onNavigate('resumes');
+                    }}
+                    className="w-full px-3 py-2 text-left text-slate-700 hover:bg-slate-50 hover:text-blue-600 rounded-lg flex items-center gap-2 cursor-pointer font-medium transition-colors"
+                  >
+                    <FolderKanban className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Resume Profiles</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      onNavigate('upload');
+                    }}
+                    className="w-full px-3 py-2 text-left text-slate-700 hover:bg-slate-50 hover:text-blue-600 rounded-lg flex items-center gap-2 cursor-pointer font-medium transition-colors"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Analyze New Resume</span>
+                  </button>
+                </div>
+              )}
 
               <div className="px-2 py-1">
                 <button
